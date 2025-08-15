@@ -670,3 +670,4 @@ func main() {
 	close(endpointCh)
 	wgTest.Wait()
 }
+.
