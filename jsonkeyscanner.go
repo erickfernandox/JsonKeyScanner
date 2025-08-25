@@ -338,7 +338,7 @@ func runAllTestsOnEndpoint(base string, allParams []string, client *http.Client)
 		},
 		{
 			Name:     "CRLF Injection",
-			Payloads: []string{`%0d%0aset-cookie:efx`, `%0d%0a%0d%0aset-cookie:efx`},
+			Payloads: []string{`%0d%0aset-cookie:efx`},
 			NeedHTML: false,
 			Detector: func(method, urlStr string, resp *http.Response, body []byte, sentBody string) (bool, string) {
 				rawHead, rawErr := fetchRawResponseHead(method, urlStr, sentBody, headers, proxy)
@@ -670,4 +670,3 @@ func main() {
 	close(endpointCh)
 	wgTest.Wait()
 }
-.
