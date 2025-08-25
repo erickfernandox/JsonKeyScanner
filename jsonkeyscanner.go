@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"path" // <= ADICIONADO
 )
 
 /*
@@ -24,7 +25,7 @@ import (
    - Lê seeds via stdin (uma por linha). Aceita host sem esquema (assume http://).
    - Faz crawl (mesmo host opcional), com profundidade -d e limite por host (-max-pages).
    - Navega por URLs "prováveis" de app (isLikelyAppURL): diretórios, com query, ou com sufixos permitidos.
-   - Fuzzing só é enviado para endpoints com sufixos permitidos OU que tenham query string.
+   - Fuzzing agora também é enviado para endpoints sem extensão no path (ex.: /login), além de sufixos permitidos OU que tenham query string.
    - Extrai nomes de parâmetros via **um** dos 4 modos (-mode):
        1=JSON keys, 2=Input name, 3=Query keys, 4=Assignments
    - Roda testes: XSS, XSS Script, CRLF (raw header "set-cookie: efx"), Redirect/SSRF, Link Manipulation, SSTI.
@@ -234,6 +235,16 @@ func hasAllowedSuffix(u *url.URL) bool {
 	p := strings.ToLower(u.Path)
 	for _, s := range suffixes { if strings.HasSuffix(p, s) { return true } }
 	return false
+}
+
+// Novo: considerar paths sem extensão como válidos para fuzz (ex.: /login, /api/v1/users, /dashboard/)
+func isExtensionlessPath(u *url.URL) bool {
+	p := u.Path
+	if p == "" { return false }                // raiz vazia não força fuzz
+	if strings.HasSuffix(p, "/") { return true } // diretório => sem extensão
+	base := path.Base(p)
+	// se o último segmento NÃO contém ponto, é sem extensão
+	return !strings.Contains(base, ".")
 }
 
 // Navegar (crawl) pode ser mais permissivo para não "matar" a exploração muito cedo.
@@ -612,8 +623,8 @@ func main() {
 					for _, k := range extractParamNamesFromBody(body, mode) { uniqAppend(pSet, k) }
 					for _, k := range queryKeysFromURL(u) { uniqAppend(pSet, k) }
 
-					// Enviar pra fuzzing somente se for sufixo permitido ou tiver query
-					if len(pSet) > 0 && (hasAllowedSuffix(u) || u.RawQuery != "") {
+					// Enviar pra fuzzing se tiver params E for sufixo permitido OU tiver query OU path sem extensão
+					if len(pSet) > 0 && (hasAllowedSuffix(u) || u.RawQuery != "" || isExtensionlessPath(u)) {
 						params := make([]string, 0, len(pSet))
 						for k := range pSet { params = append(params, k) }
 						sort.Strings(params)
